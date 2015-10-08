@@ -1,0 +1,149 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+using System.Data.SqlClient;
+using System.Data;
+using System.IO;
+using EO.Web;
+
+namespace geostepweb
+{
+    public partial class Game : System.Web.UI.Page
+    {
+    String conn = DBConnection.connectionString;
+		
+		//########## Funkcija koja se poziva na submit dugme sa ASP.Net stranice ######################
+		public void writeRespones(object sender, System.EventArgs e)
+		{
+		String imeIgre = proveraApostrofa(HiddenSHName.Value);
+		String opisIgre = proveraApostrofa(HiddenDescription.Value);
+		int gameNumber = new Random().Next(100000, 999999);
+		Nullable<Double> distance = Double.Parse(HiddenLength.Value);;            
+    Nullable<Int32> duration = Int32.Parse(HiddenDuration.Value);;
+		public String dateFrom = HiddenDateFrom.Value + " " + DateTime.Now.ToString("HH:mm:ss.fff", System.Globalization.DateTimeFormatInfo.InvariantInfo);
+		public String dateTo = HiddenDateTo.Value + " " + DateTime.Now.ToString("HH:mm:ss.fff", System.Globalization.DateTimeFormatInfo.InvariantInfo);
+		int publicGame = Int32.Parse(HiddenPublicGame.Value);
+    int outdoor = Int32.Parse(HiddenOutdoorRB.Value);
+    int timeattack = Int32.Parse(HiddenTimeRB.Value);
+		
+		int brojPitanja = Int32.Parse(HiddenNOP.Value);
+		Double[] longitudaNizString = HiddenLng.Value.Split(',').Select(n => Convert.ToDouble(n)).ToArray();
+		Double[] latitudaNizString = HiddenLat.Value.Split(',').Select(n => Convert.ToDouble(n)).ToArray();
+		List<Point> allPoints = new List <Points>;
+
+		//################### Vadjenje svih tacaka igre u listu koja ce biti proslijedjena klasi ConvexHull kojom ce biti kreirana lista tacaka omotaca
+		
+		for (int i = 0; i < brojPitanja; i++)
+            {                
+					allPoints.Add(new Point (latitudaNizString[i], longitudaNizString[i]));
+			}
+			
+			List<Point> ch = ConvexHull.CH2(allPoints);
+			
+			
+			//######################## Kreiranje upita kojim ce poligon biti unijet u bazu ################################
+			
+			String polygonCreation = "geography:: STPolyFromText(/'POLYGON(("
+				for (int i = 0; i < brojPitanja; i++){
+
+				if(i!=brojPitanja-1){
+					polygonCreation=polygonCreation+ch[i].X+" "+ch[i].Y+",";
+					} else {
+						polygonCreation=polygonCreation+ch[i].X+" "+ch[i].Y+"))/', 4326))";
+						}
+
+
+				}
+			
+			
+			//################################ UNOS IGARA U BAZU PODATAKA ####################
+            using (SqlConnection cn = new SqlConnection(conn))
+            {
+                string saveGame = "INSERT into GAME (NAME, DESCRIPTION, GAME_NUMBER, DISTANCE, VALID_FROM, VALID_TO, IS_PUBLIC, IS_OUTDOORS, IS_TIME_ATTACK, Convex_Poligon) VALUES (@imeIgre, @opisIgre, @gameNumber, @distance, @dateFrom, @dateTo, @publicGame, @outdoor, @timeattack,"+polygonCreation+")";
+
+                using (SqlCommand querrySaveGame = new SqlCommand(saveGame))
+                {
+
+                    SqlParameter paramimeIgre = new SqlParameter();
+                    paramimeIgre.ParameterName = "@imeIgre";
+                    paramimeIgre.Value = imeIgre;
+                    querrySaveGame.Parameters.Add(paramimeIgre);
+
+
+                    SqlParameter paramopisIgre = new SqlParameter();
+                    paramopisIgre.ParameterName = "@opisIgre";
+                    paramopisIgre.Value = opisIgre;
+                    querrySaveGame.Parameters.Add(paramopisIgre);
+
+                    SqlParameter paramgameNumber = new SqlParameter();
+                    paramgameNumber.ParameterName = "@gameNumber";
+                    paramgameNumber.Value = gameNumber;
+                    querrySaveGame.Parameters.Add(paramgameNumber);
+
+                    
+                    SqlParameter paramDistance = new SqlParameter();
+                    paramDistance.ParameterName = "@Distance";
+                    if (distance.HasValue)
+                    {                        
+                        paramDistance.Value = distance;
+                    } else {                        
+                        paramDistance.Value = DBNull.Value;
+                    }
+                    querrySaveGame.Parameters.Add(paramDistance);
+
+                    SqlParameter paramTime = new SqlParameter();
+                    paramTime.ParameterName = "@Time";
+                    if (duration.HasValue)
+                    {                        
+                        paramTime.Value = duration;
+                    }
+                    else {
+                        paramTime.Value = DBNull.Value;
+                    }
+                    querrySaveGame.Parameters.Add(paramTime);
+
+                    SqlParameter paramPublicgame = new SqlParameter();
+                    paramPublicgame.ParameterName = "@publicGame";
+                    paramPublicgame.Value = publicGame;
+                    querrySaveGame.Parameters.Add(paramPublicgame);
+
+                    SqlParameter paramOutdoorGame = new SqlParameter();
+                    paramOutdoorGame.ParameterName = "@outdoor";
+                    paramOutdoorGame.Value = outdoor;
+                    querrySaveGame.Parameters.Add(paramOutdoorGame);
+
+                    SqlParameter paramTimeAttack = new SqlParameter();
+                    paramTimeAttack.ParameterName = "@timeattack";
+                    paramTimeAttack.Value = timeattack;
+                    querrySaveGame.Parameters.Add(paramTimeAttack);
+
+                    SqlParameter paramDateFrom = new SqlParameter();
+                    paramDateFrom.ParameterName = "@dateFrom";
+                    paramDateFrom.Value = dateFrom;
+                    querrySaveGame.Parameters.Add(paramDateFrom);
+
+                    SqlParameter paramDateTo = new SqlParameter();
+                    paramDateTo.ParameterName = "@dateTo";
+                    paramDateTo.Value = dateTo;
+                    querrySaveGame.Parameters.Add(paramDateTo);
+
+
+                    querrySaveGame.Connection = cn;
+                    cn.Open();
+                    querrySaveGame.ExecuteNonQuery();
+                    cn.Close();
+                }
+
+            }
+			
+			
+			
+			
+		
+		}
+		
+	}
+}
